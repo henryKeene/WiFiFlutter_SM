@@ -133,7 +133,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         //        }
         //        print("SECURITY : '\(sSecurity)'")
         if #available(iOS 11.0, *) {
-            let configuration = NEHotspotConfiguration(ssid: sSSID, passphrase: sPassword, isWEP: false)
+            let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
             configuration.joinOnce = bJoinOnce ?? false
 
             NEHotspotConfigurationManager.shared.apply(configuration) { [weak self] (error) in
@@ -143,7 +143,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     return
                 }
                 try await Task.sleep(nanoseconds: 100_000_000_000)
-
+                
                 this.getSSID { (sSSID) -> () in
                     if (error != nil) {
                         if (error?.localizedDescription == "already associated.") {
