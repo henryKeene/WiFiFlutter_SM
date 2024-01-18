@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import SystemConfiguration.CaptiveNetwork
 import NetworkExtension
+import Darwin
 
 public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -142,7 +143,8 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     result(false)
                     return
                 }
-                try await Task.sleep(nanoseconds: 100_000_000_000)
+                
+                sleep(1)
                 
                 this.getSSID { (sSSID) -> () in
                     if (error != nil) {
