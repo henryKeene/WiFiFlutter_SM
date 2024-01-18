@@ -142,8 +142,8 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     result(false)
                     return
                 }
-                try await Task.sleep(nanoseconds: 1_000_000_000)
-                
+                try await Task.sleep(nanoseconds: 100_000_000_000)
+
                 this.getSSID { (sSSID) -> () in
                     if (error != nil) {
                         if (error?.localizedDescription == "already associated.") {
