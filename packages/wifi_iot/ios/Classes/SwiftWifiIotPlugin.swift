@@ -10,7 +10,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
     
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) async throws -> Void {
         switch (call.method) {
             /// Stand Alone
             case "loadWifiList":
@@ -29,7 +29,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 findAndConnect(call: call, result: result)
                 break;
             case "connect": // OK
-                connect(call: call, result: result)
+                await connect(call: call, result: result)
                 break;
             case "isConnected": // OK
                 isConnected(result: result)
