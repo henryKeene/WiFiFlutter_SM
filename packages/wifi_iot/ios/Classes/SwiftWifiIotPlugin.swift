@@ -29,7 +29,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 findAndConnect(call: call, result: result)
                 break;
             case "connect": // OK
-                await connect(call: call, result: result)
+                try await connect(call: call, result: result)
                 break;
             case "isConnected": // OK
                 isConnected(result: result)
