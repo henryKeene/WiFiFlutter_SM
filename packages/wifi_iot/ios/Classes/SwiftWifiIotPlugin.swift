@@ -31,15 +31,12 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 findAndConnect(call: call, result: result)
                 break;
             case "connect":
-                if #available(iOS 13.0, *) {
-                    Task {
-                        let success = await connect(call: call)
-                        result(success)
-                    }
-                } else {
-                    // Handle the case for iOS versions that do not support async/await
-                    result(nil)
+               
+                Task {
+                    let success = await connect(call: call)
+                    result(success)
                 }
+                
                 break;
             case "isConnected": // OK
                 isConnected(result: result)
@@ -144,7 +141,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
 
         do {
             try await NEHotspotConfigurationManager.shared.apply(configuration)
-            let connectedSSID = await getSSIDorRetry(expectedSSID: sSSID)
+            let connectedSSID = await getSSIDorRetry(expectedSSID: sSSID, retries: 3)
             if connectedSSID == sSSID {
                 print("Connected to \(sSSID)")
                 return true
@@ -231,15 +228,15 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
 
     @available(iOS 13.0, *)
     private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
-        for _ in 0..<retries {
+        var attempts = 0
+        while attempts < retries {
             if #available(iOS 14.0, *) {
                 let currentNetwork = await NEHotspotNetwork.fetchCurrent()
                 if currentNetwork?.ssid == expectedSSID {
                     return currentNetwork?.ssid
                 }
             } else {
-                // Fallback for iOS versions below 14.0, adjust according to your needs.
-                // This part remains synchronous as the original implementation.
+                // Fallback for iOS versions below 14.0
                 if let interfaces = CNCopySupportedInterfaces() as NSArray? {
                     for interface in interfaces {
                         if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
@@ -251,10 +248,11 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     }
                 }
             }
-            // Wait for 1 second before retrying
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            // Wait for a bit before retrying
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // Sleep for 1 second
+            attempts += 1 // Increment the attempt counter
         }
-        return nil
+        return nil // Return nil if all retries failed
     }
 
     private func getSSID(result: @escaping (String?) -> ()) {
