@@ -11,6 +11,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
     
+    @available(iOS 13.0.0, *)
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) async throws -> Void {
         switch (call.method) {
             /// Stand Alone
@@ -37,9 +38,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     }
                 } else {
                     // Handle the case for iOS versions that do not support async/await
-                    result(FlutterError(code: "UNAVAILABLE",
-                                        message: "iOS version does not support async operations",
-                                        details: nil))
+                    result(nil)
                 }
                 break
             case "isConnected": // OK
@@ -230,7 +229,6 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    @available(iOS 13.0.0, *)
     private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
     for _ in 0..<retries {
         if #available(iOS 14.0, *) {
@@ -258,23 +256,23 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
     return nil
 }
 
- private func getSSID(result: @escaping (String?) -> ()) {
-        if #available(iOS 14.0, *) {
-            NEHotspotNetwork.fetchCurrent(completionHandler: { currentNetwork in
-                result(currentNetwork?.ssid);
-            })
-        } else {
-            if let interfaces = CNCopySupportedInterfaces() as NSArray? {
-                for interface in interfaces {
-                    if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
-                        result(interfaceInfo[kCNNetworkInfoKeySSID as String] as? String)
-                        return
+    private func getSSID(result: @escaping (String?) -> ()) {
+            if #available(iOS 14.0, *) {
+                NEHotspotNetwork.fetchCurrent(completionHandler: { currentNetwork in
+                    result(currentNetwork?.ssid);
+                })
+            } else {
+                if let interfaces = CNCopySupportedInterfaces() as NSArray? {
+                    for interface in interfaces {
+                        if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
+                            result(interfaceInfo[kCNNetworkInfoKeySSID as String] as? String)
+                            return
+                        }
                     }
                 }
+                result(nil)
             }
-            result(nil)
         }
-    }
 
     private func getBSSID(result: @escaping (String?) -> ()) {
         if #available(iOS 14.0, *) {
