@@ -12,7 +12,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
     
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch (call.method) {
             /// Stand Alone
             case "loadWifiList":
@@ -31,9 +31,13 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 findAndConnect(call: call, result: result)
                 break;
             case "connect":
-                Task {
-                    let success = await connect(call: call)
-                    result(success)
+                Task.init {
+                    do {
+                        let success = try await connect(call: call)
+                        result(success)
+                    } catch {
+                        result(false)
+                    }
                 }
                 break;
             case "isConnected": // OK
@@ -124,7 +128,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
     }
 
     @available(iOS 13.0.0, *)
-    private func connect(call: FlutterMethodCall) async -> Bool {
+    private func connect(call: FlutterMethodCall ) async -> Bool {
     guard let sSSID = (call.arguments as? [String: AnyObject])?["ssid"] as? String,
           let sPassword = (call.arguments as? [String: AnyObject])?["password"] as? String?,
           let bJoinOnce = (call.arguments as? [String: AnyObject])?["join_once"] as? Bool?,
@@ -212,6 +216,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 if (sSSID != nil) {
                     print("Trying to disconnect from '\(sSSID!)'")
                     NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: sSSID ?? "")
+                    NEHotspotNetwork.fetchCurrent();
                     result(true)
                 } else {
                     print("Not connected to a network")
