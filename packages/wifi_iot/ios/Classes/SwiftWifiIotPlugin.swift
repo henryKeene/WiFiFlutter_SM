@@ -129,6 +129,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
+    @available(iOS 13.0.0, *)
     private func connect(call: FlutterMethodCall) async -> Bool {
     guard let sSSID = (call.arguments as? [String: AnyObject])?["ssid"] as? String,
           let sPassword = (call.arguments as? [String: AnyObject])?["password"] as? String?,
@@ -140,11 +141,11 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
 
     if #available(iOS 11.0, *) {
         let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
-        configuration.joinOnce = bJoinOnce
+        configuration.joinOnce = bJoinOnce ?? true
 
         do {
             try await NEHotspotConfigurationManager.shared.apply(configuration)
-            let connectedSSID = await getSSID(expectedSSID: sSSID)
+            let connectedSSID = await getSSIDorRetry(expectedSSID: sSSID)
             if connectedSSID == sSSID {
                 print("Connected to \(sSSID)")
                 return true
@@ -229,7 +230,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func getSSID(expectedSSID: String, retries: Int = 3) async -> String? {
+    private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
     for _ in 0..<retries {
         if #available(iOS 14.0, *) {
             let currentNetwork = await NEHotspotNetwork.fetchCurrent()
@@ -255,6 +256,24 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
     }
     return nil
 }
+
+ private func getSSID(result: @escaping (String?) -> ()) {
+        if #available(iOS 14.0, *) {
+            NEHotspotNetwork.fetchCurrent(completionHandler: { currentNetwork in
+                result(currentNetwork?.ssid);
+            })
+        } else {
+            if let interfaces = CNCopySupportedInterfaces() as NSArray? {
+                for interface in interfaces {
+                    if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
+                        result(interfaceInfo[kCNNetworkInfoKeySSID as String] as? String)
+                        return
+                    }
+                }
+            }
+            result(nil)
+        }
+    }
 
     private func getBSSID(result: @escaping (String?) -> ()) {
         if #available(iOS 14.0, *) {
