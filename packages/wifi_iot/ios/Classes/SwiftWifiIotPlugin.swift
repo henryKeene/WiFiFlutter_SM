@@ -40,7 +40,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                     // Handle the case for iOS versions that do not support async/await
                     result(nil)
                 }
-                break
+                break;
             case "isConnected": // OK
                 isConnected(result: result)
                 break;
@@ -229,32 +229,33 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
+    @available(iOS 13.0, *)
     private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
-    for _ in 0..<retries {
-        if #available(iOS 14.0, *) {
-            let currentNetwork = await NEHotspotNetwork.fetchCurrent()
-            if currentNetwork?.ssid == expectedSSID {
-                return currentNetwork?.ssid
-            }
-        } else {
-            // Fallback for iOS versions below 14.0, adjust according to your needs.
-            // This part remains synchronous as the original implementation.
-            if let interfaces = CNCopySupportedInterfaces() as NSArray? {
-                for interface in interfaces {
-                    if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
-                        let ssid = interfaceInfo[kCNNetworkInfoKeySSID as String] as? String
-                        if ssid == expectedSSID {
-                            return ssid
+        for _ in 0..<retries {
+            if #available(iOS 14.0, *) {
+                let currentNetwork = await NEHotspotNetwork.fetchCurrent()
+                if currentNetwork?.ssid == expectedSSID {
+                    return currentNetwork?.ssid
+                }
+            } else {
+                // Fallback for iOS versions below 14.0, adjust according to your needs.
+                // This part remains synchronous as the original implementation.
+                if let interfaces = CNCopySupportedInterfaces() as NSArray? {
+                    for interface in interfaces {
+                        if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
+                            let ssid = interfaceInfo[kCNNetworkInfoKeySSID as String] as? String
+                            if ssid == expectedSSID {
+                                return ssid
+                            }
                         }
                     }
                 }
             }
+            // Wait for 1 second before retrying
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
-        // Wait for 1 second before retrying
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        return nil
     }
-    return nil
-}
 
     private func getSSID(result: @escaping (String?) -> ()) {
             if #available(iOS 14.0, *) {
