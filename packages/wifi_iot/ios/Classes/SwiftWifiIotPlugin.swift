@@ -136,29 +136,39 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         print("Invalid arguments")
         return false
     }
+    let maxRetries = 3
+    var currentRetry = 0
+    var isConnected = false
 
-    if #available(iOS 11.0, *) {
-        let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
-        configuration.joinOnce = bJoinOnce ?? true
-
+    while currentRetry < maxRetries && !isConnected {
         do {
+            let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
+            configuration.joinOnce = bJoinOnce ?? true
             try await NEHotspotConfigurationManager.shared.apply(configuration)
-            let connectedSSID = await getSSIDorRetry(expectedSSID: sSSID, retries: 3)
-            if connectedSSID == sSSID {
-                print("Connected to \(sSSID)")
-                return true
+            try? await Task.sleep(nanoseconds: 1_000_000_000) 
+            getSSID { (currentSSID) in
+            if (currentSSID != nil) {
+                    if (currentSSID == sSSID) {
+                        isConnected = true
+                    }
+                } 
+            }
+        } catch let error as NEHotspotConfigurationError {
+            if error == .alreadyAssociated {
+                isConnected = true
             } else {
-                print("Failed to connect to \(sSSID)")
-                return false
+                print("Attempt \(currentRetry + 1): Error applying hotspot configuration: \(error)")
             }
         } catch {
-            print("Error applying hotspot configuration: \(error)")
-            return false
+            print("Attempt \(currentRetry + 1): Unexpected error applying hotspot configuration: \(error)")
         }
-    } else {
-        print("Not Connected, iOS version not supported")
-        return false
+        currentRetry += 1
+        if !isConnected && currentRetry < maxRetries {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
     }
+    return isConnected
+    
 }
 
     private func findAndConnect(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -216,9 +226,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 if (sSSID != nil) {
                     print("Trying to disconnect from '\(sSSID!)'")
                     NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: sSSID ?? "")
-                    NEHotspotNetwork.fetchCurrent(completionHandler: { currentNetwork in
-                        result(true)
-                        })
+                    result(true)
                 } else {
                     print("Not connected to a network")
                     result(false)
@@ -230,34 +238,6 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    @available(iOS 13.0, *)
-    private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
-        var attempts = 0
-        while attempts < retries {
-            if #available(iOS 14.0, *) {
-                let currentNetwork = await NEHotspotNetwork.fetchCurrent()
-                if currentNetwork?.ssid == expectedSSID {
-                    return currentNetwork?.ssid
-                }
-            } else {
-                // Fallback for iOS versions below 14.0
-                if let interfaces = CNCopySupportedInterfaces() as NSArray? {
-                    for interface in interfaces {
-                        if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
-                            let ssid = interfaceInfo[kCNNetworkInfoKeySSID as String] as? String
-                            if ssid == expectedSSID {
-                                return ssid
-                            }
-                        }
-                    }
-                }
-            }
-            // Wait for a bit before retrying
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // Sleep for 1 second
-            attempts += 1 // Increment the attempt counter
-        }
-        return nil // Return nil if all retries failed
-    }
 
     private func getSSID(result: @escaping (String?) -> ()) {
             if #available(iOS 14.0, *) {
