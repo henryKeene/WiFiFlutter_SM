@@ -4,6 +4,7 @@ import SystemConfiguration.CaptiveNetwork
 import NetworkExtension
 import Darwin
 
+@available(iOS 13.0.0, *)
 public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "wifi_iot", binaryMessenger: registrar.messenger())
@@ -11,8 +12,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
     
-    @available(iOS 13.0.0, *)
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) async throws -> Void {
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) async {
         switch (call.method) {
             /// Stand Alone
             case "loadWifiList":
@@ -31,12 +31,10 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 findAndConnect(call: call, result: result)
                 break;
             case "connect":
-               
                 Task {
                     let success = await connect(call: call)
                     result(success)
                 }
-                
                 break;
             case "isConnected": // OK
                 isConnected(result: result)
