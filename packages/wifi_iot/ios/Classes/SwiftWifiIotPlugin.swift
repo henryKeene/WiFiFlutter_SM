@@ -230,6 +230,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
+    @available(iOS 13.0.0, *)
     private func getSSIDorRetry(expectedSSID: String, retries: Int = 3) async -> String? {
     for _ in 0..<retries {
         if #available(iOS 14.0, *) {
