@@ -161,7 +161,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         result(FlutterMethodNotImplemented)
     }
 
-    @available(iOS 11.0, *)
+  
     private func initHotspotConfiguration(ssid: String, passphrase: String?, security: String? = nil) -> NEHotspotConfiguration {
         switch security?.uppercased() {
             case "WPA":
