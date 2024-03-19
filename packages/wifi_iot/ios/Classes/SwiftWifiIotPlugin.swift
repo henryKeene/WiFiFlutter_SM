@@ -216,7 +216,7 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
                 if (sSSID != nil) {
                     print("Trying to disconnect from '\(sSSID!)'")
                     NEHotspotConfigurationManager.shared.removeConfiguration(forSSID: sSSID ?? "")
-                    NEHotspotNetwork.fetchCurrent();
+                    NEHotspotNetwork.fetchCurrent(completionHandler: {});
                     result(true)
                 } else {
                     print("Not connected to a network")
