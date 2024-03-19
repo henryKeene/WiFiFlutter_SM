@@ -28,9 +28,19 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
             case "findAndConnect": // OK
                 findAndConnect(call: call, result: result)
                 break;
-            case "connect": // OK
-                connect(call: call, result: result)
-                break;
+            case "connect":
+                if #available(iOS 13.0, *) {
+                    Task {
+                        let success = await connect(call: call)
+                        result(success)
+                    }
+                } else {
+                    // Handle the case for iOS versions that do not support async/await
+                    result(FlutterError(code: "UNAVAILABLE",
+                                        message: "iOS version does not support async operations",
+                                        details: nil))
+                }
+                break
             case "isConnected": // OK
                 isConnected(result: result)
                 break;
@@ -118,55 +128,38 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func connect(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        let sSSID = (call.arguments as? [String : AnyObject])?["ssid"] as! String
-        let _ = (call.arguments as? [String : AnyObject])?["bssid"] as? String? // not used
-        let sPassword = (call.arguments as? [String : AnyObject])?["password"] as? String? ?? nil
-        let bJoinOnce = (call.arguments as? [String : AnyObject])?["join_once"] as! Bool?
-        let sSecurity = (call.arguments as? [String : AnyObject])?["security"] as! String?
-        
-        //        print("SSID : '\(sSSID)'")
-        //        print("PASSWORD : '\(sPassword)'")
-        //        print("JOIN_ONCE : '\(bJoinOnce)'")
-        //        if (bJoinOnce) {
-        //            print("The network will be forgotten!")
-        //        }
-        //        print("SECURITY : '\(sSecurity)'")
-        if #available(iOS 11.0, *) {
-            let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
-            configuration.joinOnce = bJoinOnce ?? false
-
-            NEHotspotConfigurationManager.shared.apply(configuration) { [weak self] (error) in
-                guard let this = self else {
-                    print("WiFi network not found")
-                    result(false)
-                    return
-                }
-                this.getSSID { (sSSID) -> () in
-                    if (error != nil) {
-                        if (error?.localizedDescription == "already associated.") {
-                            print("Connected to '\(sSSID ?? "<Unknown Network>")'")
-                            result(true)
-                        } else {
-                            print("Not Connected")
-                            result(false)
-                        }
-                    } else if let ssid = sSSID {
-                        print("Connected to " + ssid)
-                        // ssid check is required because if wifi not found (could not connect) there seems to be no error given
-                        result(ssid == sSSID)
-                    } else {
-                        print("WiFi network not found")
-                        result(false)
-                    }
-                }
-            }
-        } else {
-            print("Not Connected")
-            result(nil)
-            return
-        }
+    private func connect(call: FlutterMethodCall) async -> Bool {
+    guard let sSSID = (call.arguments as? [String: AnyObject])?["ssid"] as? String,
+          let sPassword = (call.arguments as? [String: AnyObject])?["password"] as? String?,
+          let bJoinOnce = (call.arguments as? [String: AnyObject])?["join_once"] as? Bool?,
+          let sSecurity = (call.arguments as? [String: AnyObject])?["security"] as? String? else {
+        print("Invalid arguments")
+        return false
     }
+
+    if #available(iOS 11.0, *) {
+        let configuration = initHotspotConfiguration(ssid: sSSID, passphrase: sPassword, security: sSecurity)
+        configuration.joinOnce = bJoinOnce
+
+        do {
+            try await NEHotspotConfigurationManager.shared.apply(configuration)
+            let connectedSSID = await getSSID(expectedSSID: sSSID)
+            if connectedSSID == sSSID {
+                print("Connected to \(sSSID)")
+                return true
+            } else {
+                print("Failed to connect to \(sSSID)")
+                return false
+            }
+        } catch {
+            print("Error applying hotspot configuration: \(error)")
+            return false
+        }
+    } else {
+        print("Not Connected, iOS version not supported")
+        return false
+    }
+}
 
     private func findAndConnect(call: FlutterMethodCall, result: @escaping FlutterResult) {
         result(FlutterMethodNotImplemented)
@@ -235,23 +228,32 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func getSSID(result: @escaping (String?) -> ()) {
+    private func getSSID(expectedSSID: String, retries: Int = 3) async -> String? {
+    for _ in 0..<retries {
         if #available(iOS 14.0, *) {
-            NEHotspotNetwork.fetchCurrent(completionHandler: { currentNetwork in
-                result(currentNetwork?.ssid);
-            })
+            let currentNetwork = await NEHotspotNetwork.fetchCurrent()
+            if currentNetwork?.ssid == expectedSSID {
+                return currentNetwork?.ssid
+            }
         } else {
+            // Fallback for iOS versions below 14.0, adjust according to your needs.
+            // This part remains synchronous as the original implementation.
             if let interfaces = CNCopySupportedInterfaces() as NSArray? {
                 for interface in interfaces {
                     if let interfaceInfo = CNCopyCurrentNetworkInfo(interface as! CFString) as NSDictionary? {
-                        result(interfaceInfo[kCNNetworkInfoKeySSID as String] as? String)
-                        return
+                        let ssid = interfaceInfo[kCNNetworkInfoKeySSID as String] as? String
+                        if ssid == expectedSSID {
+                            return ssid
+                        }
                     }
                 }
             }
-            result(nil)
         }
+        // Wait for 1 second before retrying
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
+    return nil
+}
 
     private func getBSSID(result: @escaping (String?) -> ()) {
         if #available(iOS 14.0, *) {
